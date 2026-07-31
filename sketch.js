@@ -1,26 +1,35 @@
 'use strict';
 
+/**
+ * コンピュータ基礎II 課題1
+ * 「コンピュータ・プログラムを使う面白さを意識する」
+ *
+ * 必須4点:
+ * 1. 点・線・面のいずれかを描画する
+ * 2. 色を数値で指定する
+ * 3. 繰り返し と 条件分岐 の両方を利用する
+ * 4. ランダム（乱数）を利用する
+ */
+
 let img;
 
 function preload() {
-  img = loadImage('data/pic.png'); // 最初に表示する画像
+  img = loadImage('data/pic.png');
 }
 
 function setup() {
   createCanvas(600, 800);
   prepareImage(img);
 
-  // 色相0〜360 / 彩度・明度・透明度 0〜100
+  // 【要件2】色を数値で指定（HSB: 色相0-360, 彩度・明度・透明度0-100）
   colorMode(HSB, 360, 100, 100, 100);
   noStroke();
 
-  // ファイル選択したら画像を読み込む
   select('#imageInput').changed(onImageSelected);
 }
 
-// 画像を整え、キャンバスサイズを合わせる
 function prepareImage(source) {
-  // 最大辺を128pxにする（縦横比はキープ）
+  // 【条件分岐】縦長 / 横長でリサイズの仕方を変える（最大辺128px）
   if (source.width >= source.height) {
     source.resize(128, 0);
   } else {
@@ -28,7 +37,7 @@ function prepareImage(source) {
   }
   img = source;
 
-  // キャンバスを画像の縦横比に合わせる（最大800px）
+  // 【条件分岐】キャンバスを画像の縦横比に合わせる
   let aspect = img.width / img.height;
   if (aspect >= 1) {
     resizeCanvas(800, 800 / aspect);
@@ -37,10 +46,12 @@ function prepareImage(source) {
   }
 }
 
-// ユーザーが選んだ画像を読み込む
 function onImageSelected() {
   let file = select('#imageInput').elt.files[0];
-  if (!file || !file.type.startsWith('image/')) return;
+  // 【条件分岐】画像ファイル以外は無視
+  if (!file || !file.type.startsWith('image/')) {
+    return;
+  }
 
   let reader = new FileReader();
   reader.onload = function (e) {
@@ -49,7 +60,7 @@ function onImageSelected() {
   reader.readAsDataURL(file);
 }
 
-// RGBのピクセル色から H（色相）S（彩度）B（明度）を取り出す
+// RGB → HSB（数値の色として扱うため）
 function rgbToHsb(r, g, b) {
   colorMode(RGB, 255);
   let c = color(r, g, b);
@@ -60,38 +71,48 @@ function rgbToHsb(r, g, b) {
   return { h: h, s: s, b: bri };
 }
 
-// マウスY位置 → 明度の効果量（1〜100）
-// 上のほうですぐ中間色へ近づき、下のほうで黒へ向かう
+// マウスY → 明度の効果量（白→中間→黒）
 function brightnessFromMouse() {
-  let t = constrain(mouseY / height, 0, 1); // 0=上, 1=下
+  let t = constrain(mouseY / height, 0, 1);
 
-  if (t <= 0.2) return map(t, 0, 0.2, 1, 40);   // 白 → 中間
-  if (t <= 0.8) return map(t, 0.2, 0.8, 40, 60); // 中間あたり
-  return map(t, 0.8, 1, 60, 100);                 // 中間 → 黒
+  // 【条件分岐】マウス位置の区間ごとにマップを変える
+  if (t <= 0.2) {
+    return map(t, 0, 0.2, 1, 40); // 白 → 中間
+  } else if (t <= 0.8) {
+    return map(t, 0.2, 0.8, 40, 60); // 中間
+  } else {
+    return map(t, 0.8, 1, 60, 100); // 中間 → 黒
+  }
 }
 
-// 効果量に応じて、白 / 元の明度 / 黒 のあいだで明度を決める
 function mixBrightness(originalB, amount) {
-  if (amount <= 40) return map(amount, 1, 40, 100, originalB); // 白 → 元
-  if (amount <= 60) return originalB;                           // 元のまま
-  return map(amount, 60, 100, originalB, 0);                    // 元 → 黒
+  // 【条件分岐】効果量に応じて白 / 元色 / 黒 を切り替える
+  if (amount <= 40) {
+    return map(amount, 1, 40, 100, originalB);
+  } else if (amount <= 60) {
+    return originalB;
+  } else {
+    return map(amount, 60, 100, originalB, 0);
+  }
 }
 
 function draw() {
-  if (!img) return;
+  if (!img) {
+    return;
+  }
 
-  background(0, 0, 100); // 白い背景
+  background(0, 0, 100);
   img.loadPixels();
 
   let tileW = width / img.width;
   let tileH = height / img.height;
   let cell = max(tileW, tileH);
 
-  // マウスX: 彩度（左=0 白黒, 右=1 元の色）
+  // マウスX: 彩度（左=白黒, 右=元の色）
   let satFactor = map(mouseX, 0, width, 0, 1, true);
   let amount = brightnessFromMouse();
 
-  // ピクセルを1つずつ見て、点を描く
+  // 【要件3: 繰り返し】すべてのピクセルを走査して描画
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
       let i = 4 * (y * img.width + x);
@@ -100,20 +121,32 @@ function draw() {
       let finalS = c.s * satFactor;
       let finalB = constrain(mixBrightness(c.b, amount), 0, 100);
 
-      // 明るいほど小さく、暗いほど大きく（ただし最小サイズは残す）
-      let dotSize = map(finalB, 100, 0, cell * 0.25, cell * 1.5);
+      // 明度で点の大きさを変える（明るい=小, 暗い=大。最小サイズは残す）
+      let minSize = cell * 0.25;
+      let maxSize = cell * 1.5;
+      let dotSize = map(finalB, 100, 0, minSize, maxSize);
 
-      // 少しずらして手描き感を出す
+      // 【要件4: ランダム】位置を少しずらして点描らしい揺らぎを出す
       let px = tileW * x + tileW / 2 + random(-1, 1);
       let py = tileH * y + tileH / 2 + random(-1, 1);
 
+      // 【要件2】色を数値（H, S, B）で指定
       fill(c.h, finalS, finalB);
-      ellipse(px, py, dotSize, dotSize);
+
+      // 【要件3: 条件分岐】＋【要件1: 点 / 面】
+      // 明るい部分は「点」（円）、暗い部分は「面」（四角）で描き分ける
+      if (finalB >= 45) {
+        ellipse(px, py, dotSize, dotSize); // 点
+      } else {
+        rectMode(CENTER);
+        rect(px, py, dotSize, dotSize); // 面
+      }
     }
   }
 }
 
 function keyReleased() {
+  // 【条件分岐】Sキーのときだけ保存
   if (key === 's' || key === 'S') {
     saveCanvas('pointillism_art', 'png');
   }
